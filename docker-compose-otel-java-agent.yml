@@ -1,0 +1,47 @@
+version: '3'
+services:
+  app:
+    build: ./
+    environment:
+      OTEL_SERVICE_NAME: "agent-example-app"
+      OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: "http://host.docker.internal:4318/v1/traces"
+      OTEL_EXPORTER_OTLP_METRICS_ENDPOINT: "http://host.docker.internal:4318/v1/metrics"
+      OTEL_EXPORTER_OTLP_LOGS_ENDPOINT: "http://host.docker.internal:4318/v1/logs"
+      # Logs are disabled by default
+      OTEL_LOGS_EXPORTER: "otlp"
+      # Optional specify file configuration instead of using environment variable scheme
+      # To use, call "export OTEL_EXPERIMENTAL_CONFIG_FILE=/sdk-config.yaml" before calling docker compose up
+      OTEL_EXPERIMENTAL_CONFIG_FILE:
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./sdk-config.yaml:/sdk-config.yaml
+    networks:
+      - grafana-intro-to-mltp-otel_otel2
+
+  ping-monitor:
+    image: alpine:latest
+    container_name: ping-monitor
+    command: >
+      sh -c "
+      apk add --no-cache curl &&
+      echo 'Starting infinite ping monitor...' &&
+      while true; do
+        echo -n \"$$(date '+%Y-%m-%d %H:%M:%S') - \"
+        if curl -s -f -m 5 http://app:8080/ping; then
+          echo \" - Success\"
+        else
+          echo \"Ping failed or timeout\"
+        fi
+        sleep 2
+      done
+      "
+    networks:
+      - grafana-intro-to-mltp-otel_otel2
+    restart: unless-stopped
+    tty: true
+    stdin_open: true
+
+networks:
+  grafana-intro-to-mltp-otel_otel2:
+    external: true
